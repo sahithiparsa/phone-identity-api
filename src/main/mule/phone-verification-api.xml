@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:java="http://www.mulesoft.org/schema/mule/java" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/java http://www.mulesoft.org/schema/mule/java/current/mule-java.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="ccbd9caa-a057-42b6-9500-069c7e51eff0" >
+		<http:listener-connection host="0.0.0.0" port="8091" />
+	</http:listener-config>
+	<file:config name="File_Config" doc:name="File Config" doc:id="f97d2b6f-db28-4063-97df-6d3658702eda" >
+		<file:connection workingDir="D:/" />
+	</file:config>
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="63be4fda-dcda-4393-92a7-94149879be4f" >
+		<http:request-connection protocol="HTTPS" host="${syniverse.host}"/>
+	</http:request-config>
+	<http:request-config name="HTTP_Request_configuration1" doc:name="HTTP Request configuration" doc:id="dba9d443-e469-4486-8e6e-b1310f56b66f" >
+		<http:request-connection protocol="HTTPS" host="${syniverse.host}"/>
+	</http:request-config>
+	<configuration-properties doc:name="Configuration properties" doc:id="86d52592-7340-414b-ab3c-6f1590fc125b" file="env-${env}.yaml" />
+	<global-property doc:name="Global Property" doc:id="183024a0-7028-4019-9fc5-d4dfcccc2b65" name="env" value="dev" />
+	<flow name="phone-verification-apiFlow" doc:id="7dd80a26-11d9-4202-b770-cd5d86d23756" >
+		<http:listener doc:name="Listener" doc:id="67e1f96c-8083-4c4f-8f4c-ee3681a901d0" config-ref="HTTP_Listener_config" path="/api/*"/>
+		<logger level="INFO" doc:name="Logger" doc:id="b5a0d899-2142-4bc8-bd80-4df59075f193" category="Start of the flow: Before creating java instance"/>
+		
+		<flow-ref doc:name="Flow Reference" doc:id="70599f99-188a-41d4-82f2-d6052ce1ccb6" name="syniverse-number-verification-flow"/>
+		<logger level="INFO" doc:name="Logger" doc:id="3aeaf535-8e25-404b-adca-b5df33f23b8a" category="End of the flow: After saving the excel sheet"/>
+	</flow>
+</mule>

@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+	<ee:object-store-caching-strategy name="Caching_Strategy" doc:name="Caching Strategy" doc:id="871c1f4b-3981-4a69-bb6e-ac5f48b72ee9"/>
+	<file:config name="File_Config1" doc:name="File Config" doc:id="32966358-cf49-4c8e-9c18-ff33c9e9d2fb" >
+		<file:connection workingDir="D:/" />
+	</file:config>
+	<flow name="syniverse-number-verification-flow" initialState="started">
+	<flow-ref doc:name="syniverse-token-flow" doc:id="f7fdba6d-fbff-4669-882c-798280e7fba4" name="syniverse-token-flow" />
+		<ee:transform doc:name="Filtered Payload with cis_phone_primary" doc:id="a8ad0ae7-5675-4934-9a3f-c1b51a6f04ac">
+    <ee:message >
+      <ee:set-payload ><![CDATA[%dw 2.0
+var myInput = readUrl("classpath://phone_verification-request.xlsx", "application/xlsx")
+output application/json
+---
+myInput."Sheet1" filter ((entry, index) -> entry."FIS - cis_phone_primary" != "\s+" and entry."FIS - cis_phone_primary" != "" and entry."FIS - cis_phone_primary" != 0)]]></ee:set-payload>
+    </ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="payload_isMobile" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+			</ee:variables>
+  
+</ee:transform>
+		<!-- <java:new doc:name="Verification Instance" doc:id="257887c6-acb4-4194-9762-d14a7b24eb5a" class="com.velo.Verification" constructor="Verification()" target="verification"/>
+		<logger level="INFO" doc:name="Logger for instance" doc:id="306a6919-9060-49b6-8bb8-d1cd404f8ff1" message="#[vars.verification]" category="Created instance and before invoking verfication java class"/>
+		<java:invoke doc:name="Invoke" doc:id="42da636c-6dc9-4fbe-8748-724539bd1e54" class="com.velo.Verification" instance="#[vars.verification]" method="phoneVerification()" target="result">
+				</java:invoke> -->
+		<logger level="INFO" doc:name="Logger" doc:id="4dcb0071-a7b2-47ae-b5bb-2a88fd0bcb93" message="Filtered Payload with cis_phone_primary -- &gt; #[payload]"/>
+		<flow-ref doc:name="syniverse-number-identity-flow" doc:id="3c21e3f5-90cf-4e91-96e1-f7e4c138928c" name="syniverse-number-identity-flow"/>
+		<logger level="INFO" doc:name="Logger" doc:id="2e2bba13-c3a1-4983-9501-8d90457b3b9b" message="Output before writing it as xlsx #[vars.payload_isMobile]"/>
+		<file:write doc:name="Write to File" doc:id="c71c5b03-96dc-433f-b4e0-9a889cd34781" path="phone_identity_response.xlsx" config-ref="File_Config1">
+			<file:content ><![CDATA[#[output application/xlsx header=true
+---
+{
+	Sheet1: vars.payload_isMobile	
+}]]]></file:content>
+		</file:write>
+		<ee:transform doc:name="Transform Message" doc:id="4ff43e7a-1f3c-4e4a-8517-74c7948a378e">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output text/plain
+---
+"Please check the excel sheet saved under D:/phone_identity_response.xlsx"]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow doc:name="token-api-flow" name="syniverse-token-flow" initialState="started">
+		<ee:cache doc:name="Cache" doc:id="5ca57d30-186e-4a18-9e74-64c5595d106c" cachingStrategy-ref="Caching_Strategy">
+			<http:request method="GET" doc:name="Token HTTP Request" doc:id="a68a1efa-1d09-447b-a20f-7ac4c0547b4f" path="${syniverse.endpoints.token}" config-ref="HTTP_Request_configuration" responseTimeout="${http.request.timeout}">
+			<http:query-params><![CDATA[#[output application/java
+---
+{
+	"consumerkey" : "G8QKwUT6EiSDRIyM2vqEdgTPBbEa",
+	"consumersecret" : "iktProgsImf61KUdPLHYbSTLh7oa",
+	"oldtoken" : "68d68d01993-ebc6-3295-af66-b7975cfa3b0101993-ebc6-3295-af66-b7975cfa3b01"
+}]]]></http:query-params>
+		</http:request>
+			<ee:transform doc:name="Transform Message" doc:id="81f124a0-cdfb-4490-88e3-ea338321ddb1">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="accessToken"><![CDATA[%dw 2.0
+output application/json
+---
+payload.accessToken]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		</ee:cache>
+
+	</flow>
+	<flow name="syniverse-number-identity-flow">
+		<try doc:name="Try" doc:id="61180a2f-111c-4229-b2ca-3187e5152300">
+			<foreach doc:name="For Each" doc:id="b93616d8-77ba-46cb-8192-a4ced743573f" collection="payload">
+			<ee:transform doc:name="Extract phone_number conditionally" doc:id="21aaf5b6-6af8-40a5-a354-ec8986e0d575">
+					<ee:message>
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="phone_number" ><![CDATA[%dw 2.0
+import isNumeric from dw::core::Strings
+var phone_num = payload."FIS - cis_phone_primary" as String
+output application/json
+---
+		if (trim(phone_num) matches /^[0-9]{10}$/) 
+			"%2B1" ++ phone_num
+		 else if (trim(phone_num) matches /^[0-9]{11}$/)
+			"%2B86" ++ phone_num
+		else 
+			""]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<choice doc:name="Choice" doc:id="6d342055-5ede-42b6-a0ca-47c614951432" >
+					<when expression='#[vars.phone_number != ""]'>
+						<http:request method="GET" doc:name="Phone Identity HTTP Request" doc:id="9b81c4b6-a811-457a-aa5e-02e9bafebfe2" path="${syniverse.endpoints.numberidentity}/{ph_num}" config-ref="HTTP_Request_configuration1" responseTimeout="${http.request.timeout}" target="phone_identity_res">
+			<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer " ++ vars.accessToken
+}]]]></http:headers>
+			<http:uri-params><![CDATA[#[output application/java
+---
+{
+	"ph_num" : vars.phone_number
+}]]]></http:uri-params>
+		</http:request>
+						<ee:transform doc:name="Adding IsMobile" doc:id="e85976bd-f98b-4b34-b12a-93ee872edb56">
+					<ee:message>
+						<ee:set-payload><![CDATA[output application/json
+---
+payload ++ {
+	"isMobile" : 
+	if (vars.phone_identity_res.numberidentity.number_type == "M")
+		true
+	else
+		false
+}
+]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+					</when>
+					<otherwise >
+						<logger level="INFO" doc:name="Logger" doc:id="236bf1fe-6fdc-4497-a46f-f9bcd3b01b38" message="Invalid Phone number "/>
+					</otherwise>
+				</choice>
+				<ee:transform doc:name="Accumulating payload" doc:id="619dce61-f207-4507-8ebc-b8ac3f4bd67a">
+							<ee:message>
+							</ee:message>
+							<ee:variables>
+								<ee:set-variable variableName="payload_isMobile"><![CDATA[%dw 2.0
+output application/java
+---
+vars.payload_isMobile + payload]]></ee:set-variable>
+							</ee:variables>
+						</ee:transform>
+		</foreach>
+		</try>
+
+	</flow>
+	</mule>
