@@ -92,7 +92,7 @@ output application/json
 ---
 		if (trim(phone_num) matches /^[0-9]{10}$/) 
 			"%2B1" ++ phone_num
-		 else if (trim(phone_num) matches /^[0-9]{11}$/)
+		else if (trim(phone_num) matches /^[0-9]{11}$/)
 			"%2B86" ++ phone_num
 		else 
 			""]]></ee:set-variable>
@@ -142,6 +142,11 @@ vars.payload_isMobile + payload]]></ee:set-variable>
 							</ee:variables>
 						</ee:transform>
 		</foreach>
+			<error-handler >
+				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="711b3876-8569-46a7-8fc7-1f590b2639d4" >
+					<logger level="ERROR" doc:name="Logger" doc:id="3416e79a-0965-47c0-9d93-67eb70405654" message="Error occurred during Foreach #[payload]"/>
+				</on-error-continue>
+			</error-handler>
 		</try>
 
 	</flow>
