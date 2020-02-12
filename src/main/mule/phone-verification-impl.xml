@@ -11,17 +11,17 @@ http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/fil
 http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
 	<ee:object-store-caching-strategy name="Caching_Strategy" doc:name="Caching Strategy" doc:id="871c1f4b-3981-4a69-bb6e-ac5f48b72ee9"/>
 	<file:config name="File_Config1" doc:name="File Config" doc:id="32966358-cf49-4c8e-9c18-ff33c9e9d2fb" >
-		<file:connection workingDir="D:/" />
+		<file:connection workingDir="/Users/amahajan/Desktop" />
 	</file:config>
 	<flow name="syniverse-number-verification-flow" initialState="started">
 	<flow-ref doc:name="syniverse-token-flow" doc:id="f7fdba6d-fbff-4669-882c-798280e7fba4" name="syniverse-token-flow" />
 		<ee:transform doc:name="Filtered Payload with cis_phone_primary" doc:id="a8ad0ae7-5675-4934-9a3f-c1b51a6f04ac">
     <ee:message >
       <ee:set-payload ><![CDATA[%dw 2.0
-var myInput = readUrl("classpath://phone_verification-request.xlsx", "application/xlsx")
+var myInput = readUrl("classpath://FIS-DI-CI-Match-110419.xlsx", "application/xlsx")
 output application/json
 ---
-myInput."Sheet1" filter ((entry, index) -> entry."FIS - cis_phone_primary" != "\s+" and entry."FIS - cis_phone_primary" != "" and entry."FIS - cis_phone_primary" != 0)]]></ee:set-payload>
+myInput."Sheet1" filter ((entry, index) -> entry."FIS - cis_phone_primary" != "\s+" and entry."FIS - cis_phone_primary" != "" )]]></ee:set-payload>
     </ee:message>
 			<ee:variables >
 				<ee:set-variable variableName="payload_isMobile" ><![CDATA[%dw 2.0
@@ -121,7 +121,7 @@ payload ++ {
 	if (vars.phone_identity_res.numberidentity.number_type == "M")
 		true
 	else
-		false
+		vars.phone_identity_res.numberidentity.number_type
 }
 ]]></ee:set-payload>
 					</ee:message>
@@ -129,6 +129,16 @@ payload ++ {
 					</when>
 					<otherwise >
 						<logger level="INFO" doc:name="Logger" doc:id="236bf1fe-6fdc-4497-a46f-f9bcd3b01b38" message="Invalid Phone number "/>
+						<ee:transform doc:name="Copy_of_Adding IsMobile" doc:id="854e6c6d-9d08-4201-b692-4a5a88e61378" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[output application/json
+---
+payload ++ {
+	"isMobile" : "N/A"
+}
+]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
 					</otherwise>
 				</choice>
 				<ee:transform doc:name="Accumulating payload" doc:id="619dce61-f207-4507-8ebc-b8ac3f4bd67a">
