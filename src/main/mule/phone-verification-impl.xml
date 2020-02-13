@@ -22,7 +22,7 @@ http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/
 			doc:id="a8ad0ae7-5675-4934-9a3f-c1b51a6f04ac">
 			<ee:message>
 				<ee:set-payload><![CDATA[%dw 2.0
-var myInput = readUrl("classpath://phone_verification-request-4500.xlsx", "application/xlsx")
+var myInput = readUrl("classpath://phone_verification-request-50000.xlsx", "application/xlsx")
 output application/json
 ---
 myInput."Sheet1"]]></ee:set-payload>
@@ -71,7 +71,7 @@ output text/plain
 			cachingStrategy-ref="Caching_Strategy">
 			<http:request method="GET" doc:name="Token HTTP Request"
 				doc:id="a68a1efa-1d09-447b-a20f-7ac4c0547b4f" path="${syniverse.endpoints.token}"
-				config-ref="HTTP_Request_configuration" responseTimeout="${http.request.timeout}">
+				config-ref="HTTP_Request_configuration" responseTimeout="${http.request.timeout}" target="token_api_resp">
 				<http:query-params><![CDATA[#[output application/java
 ---
 {
@@ -88,7 +88,7 @@ output text/plain
 					<ee:set-variable variableName="accessToken"><![CDATA[%dw 2.0
 output application/json
 ---
-payload.accessToken]]></ee:set-variable>
+vars.token_api_resp.accessToken]]></ee:set-variable>
 				</ee:variables>
 			</ee:transform>
 		</ee:cache>
@@ -96,7 +96,7 @@ payload.accessToken]]></ee:set-variable>
 	</flow>
 	<flow name="syniverse-number-identity-flow">
 		<try doc:name="Try" doc:id="61180a2f-111c-4229-b2ca-3187e5152300">
-			<foreach doc:name="For Each" doc:id="b93616d8-77ba-46cb-8192-a4ced743573f" collection="payload" batchSize="500">
+			<foreach doc:name="For Each" doc:id="b93616d8-77ba-46cb-8192-a4ced743573f" collection="payload" batchSize="1000">
 				<foreach doc:name="For Each" doc:id="60c52da7-869c-48c1-8026-b107bbc7181e" collection="payload">
 				<ee:transform doc:name="Extract phone_number conditionally" doc:id="2a7b2b76-3476-4f30-8ae2-126c15a374b7">
 							<ee:message />
@@ -116,21 +116,26 @@ output application/json
 						</ee:transform>
 				<choice doc:name="Choice" doc:id="6d342055-5ede-42b6-a0ca-47c614951432" >
 					<when expression='#[vars.phone_number != "invalid"]'>
-						<http:request method="GET" doc:name="Phone Identity HTTP Request" doc:id="9b81c4b6-a811-457a-aa5e-02e9bafebfe2" path="${syniverse.endpoints.numberidentity}/{ph_num}" config-ref="HTTP_Request_configuration1" responseTimeout="${http.request.timeout}" target="phone_identity_res">
-			<http:headers><![CDATA[#[output application/java
----
-{
-	"Authorization" : "Bearer " ++ vars.accessToken
-}]]]></http:headers>
-			<http:uri-params><![CDATA[#[output application/java
----
-{
-	"ph_num" : vars.phone_number
-}]]]></http:uri-params>
-		</http:request>
-						<ee:transform doc:name="Adding IsMobile as True" doc:id="e85976bd-f98b-4b34-b12a-93ee872edb56">
+							<try doc:name="Try" doc:id="f25e997b-19fc-4980-b753-bb1bf90a4319" >
+							<flow-ref name="syniverse-identity-api-call-flow" doc:name="syniverse-identity-api-call-flow"/>
+							<error-handler >
+								<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="711b3876-8569-46a7-8fc7-1f590b2639d4" >
+									<choice doc:name="Choice" doc:id="a5d9980a-9980-44cc-870e-5055080f7f9d" >
+										<when expression='#[error.errorType.identifier=="UNAUTHORIZED" or error.muleMessage.typedAttributes.statusCode == 401]'>
+											<flow-ref doc:name="syniverse-token-flow" doc:id="0bd73c90-fabe-472f-99b5-fdfc47c07504" name="syniverse-token-flow"/>
+												<flow-ref doc:name="syniverse-identity-api-call-flow" doc:id="8df766fa-1812-4935-b5c4-c196f8cad074" name="syniverse-identity-api-call-flow" />
+										
+</when>
+										<otherwise >
+											<logger level="ERROR" doc:name="Logger" doc:id="3416e79a-0965-47c0-9d93-67eb70405654" message="Error occurred in calling Number Identity API" />
+										</otherwise>
+									</choice>
+								</on-error-continue>
+							</error-handler>
+							</try>
+							<ee:transform doc:name="Adding IsMobile as True" doc:id="e85976bd-f98b-4b34-b12a-93ee872edb56">
 					<ee:message>
-								<ee:set-payload ><![CDATA[%dw 2.0
+								<ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
 payload ++ {
@@ -142,7 +147,7 @@ payload ++ {
 }
 ]]></ee:set-payload>
 					</ee:message>
-							<ee:variables >
+							<ee:variables>
 							</ee:variables>
 				</ee:transform>
 					</when>
@@ -178,10 +183,27 @@ vars.payload_isMobile + payload wait 2000]]></ee:set-variable>
 		</foreach>
 			<error-handler >
 				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="711b3876-8569-46a7-8fc7-1f590b2639d4" >
-					<logger level="ERROR" doc:name="Logger" doc:id="3416e79a-0965-47c0-9d93-67eb70405654" message="Error occurred during Foreach #[payload]"/>
+					<logger level="ERROR" doc:name="Logger" doc:id="3416e79a-0965-47c0-9d93-67eb70405654" message="Error occurred during Foreach #[payload]" />
 				</on-error-continue>
 			</error-handler>
 		</try>
 
+	</flow>
+	<flow name="syniverse-identity-api-call-flow" initialState="started">
+	<http:request method="GET" doc:name="Phone Identity HTTP Request" doc:id="9b81c4b6-a811-457a-aa5e-02e9bafebfe2" path="${syniverse.endpoints.numberidentity}/{ph_num}" config-ref="HTTP_Request_configuration1" responseTimeout="${http.request.timeout}" target="phone_identity_res">
+			<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer " ++ vars.accessToken
+}]]]></http:headers>
+			<http:uri-params><![CDATA[#[output application/java
+---
+{
+	"ph_num" : vars.phone_number
+}]]]></http:uri-params>
+								<http:response-validator>
+									<http:success-status-code-validator values="200" />
+								</http:response-validator>
+		</http:request>
 	</flow>
 	</mule>
